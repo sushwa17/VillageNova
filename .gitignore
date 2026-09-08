@@ -1,0 +1,17 @@
+# Secrets and generated data
+.env
+.venv/
+__pycache__/
+*.pyc
+krishi_agent/.venv/
+krishi_agent/__pycache__/
+krishi_agent/data/
+village_hub/data/
+cattle_agent/data/
+irrigation_agent/data/
+livelihoods_agent/data/
+women_support/data/
+health_agent/data/
+education_agent/data/
+public_services_agent/data/
+village_updates/data/
