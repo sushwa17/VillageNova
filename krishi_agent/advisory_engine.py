@@ -12,6 +12,10 @@ model — for a farmer-facing safety message ("hold off spraying"), a
 rule you can point to and justify beats a prediction you can't.
 """
 
+import os
+
+import requests
+
 CROPS = {
     "soybean": {"en": "Soybean", "hi": "सोयाबीन", "te": "సోయాబీన్", "mandi": "Berasia Mandi"},
     "wheat":   {"en": "Wheat",   "hi": "गेहूं",   "te": "గోధుమ", "mandi": "Bhopal Mandi"},
@@ -94,19 +98,59 @@ def build_personalized_message(farmer: dict, weather: dict, price: dict, advisor
     crop = CROPS.get(farmer["crop"], CROPS["wheat"])
     name = farmer["name"].split()[0]
     location = farmer.get("village") or "your farm"
+    language = farmer.get("language", "en")
+    crop_name = crop.get(language, crop["en"])
     lines = [
         f"Namaste {name}, Krishi Setu update for {location}:",
-        f"{crop['en']}: {advisory[farmer['language']].replace(' -KrishiSetu', '')}",
+        f"{crop_name}: {advisory[language].replace(' -KrishiSetu', '').replace(' -कृषि सेतु', '').replace(' -కృషి సేతు', '')}",
         f"Weather: {weather['temp']}C, rain chance {weather['rain']}%, wind {weather['wind']} km/h.",
         f"Mandi: {price['market']} {price['price']} per quintal ({price['change']:+d}% vs yesterday).",
     ]
-    if farmer["language"] == "hi":
+    if language == "hi":
         lines[0] = f"नमस्ते {name}, {location} के लिए कृषि सेतु संदेश:"
         lines[2] = f"मौसम: {weather['temp']}°C, बारिश की संभावना {weather['rain']}%, हवा {weather['wind']} किमी/घं।"
         lines[3] = f"मंडी: {price['market']} में भाव {price['price']} रुपये/क्विंटल ({price['change']:+d}%)।"
-    elif farmer["language"] == "te":
+    elif language == "te":
         lines[0] = f"నమస్కారం {name}, {location} కోసం కృషి సేతు సందేశం:"
         lines[1] = f"{crop['te']}: {advisory['te'].replace(' -కృషి సేతు', '')}"
         lines[2] = f"వాతావరణం: {weather['temp']}°C, వర్షం అవకాశం {weather['rain']}%, గాలి {weather['wind']} కి.మీ/గం."
         lines[3] = f"మార్కెట్: {price['market']}లో ధర క్వింటాల్‌కు {price['price']} ({price['change']:+d}%)."
     return "\n".join(lines)
+
+
+def generate_fresh_message(farmer: dict, weather: dict, price: dict, advisory: dict) -> str | None:
+    """Ask an optional AI provider to freshly phrase a grounded advisory."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    local_provider = "localhost" in base_url or "127.0.0.1" in base_url
+    if not api_key and not local_provider:
+        return None
+    language = farmer.get("language", "en")
+    language_name = {"en": "English", "hi": "Hindi", "te": "Telugu"}.get(language, "English")
+    prompt = (
+        f"Write a fresh, concise farmer advisory in {language_name} for {farmer['name']} in {farmer['village']}. "
+        f"Crop: {farmer['crop']}; growth stage: {farmer['stage']}. "
+        f"Weather: {weather['temp']}C, rain chance {weather['rain']}%, wind {weather['wind']} km/h. "
+        f"Market: {price['market']}, {price['price']} per quintal, change {price['change']}%. "
+        f"Grounded rule advisory: {advisory[language]}. "
+        "Use only these facts, give one clear action, and do not invent schemes, dates, prices, or contacts."
+    )
+    try:
+        response = requests.post(
+            base_url + "/chat/completions",
+            headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {api_key}"} if api_key else {})},
+            json={
+                "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                "temperature": 0.8,
+                "messages": [
+                    {"role": "system", "content": "You write safe agricultural advisories grounded only in supplied facts."},
+                    {"role": "user", "content": prompt},
+                ],
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+        content = response.json()["choices"][0]["message"]["content"].strip()
+        return content or None
+    except (requests.RequestException, KeyError, IndexError, TypeError, ValueError):
+        return None

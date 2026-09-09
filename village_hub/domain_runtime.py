@@ -1,7 +1,14 @@
 """Runtime shared by the independently runnable village domain agents."""
 import json
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
+
+from openpyxl import Workbook, load_workbook
+import requests
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parents[1] / "krishi_agent" / ".env")
 
 DOMAIN_DEFINITIONS = {
     "cattle": {
@@ -79,16 +86,182 @@ DOMAIN_DEFINITIONS = {
 }
 
 
+LOCALIZED_MESSAGES = {
+    "cattle": {
+        "hi": [
+            "{animals} के लिए साफ पानी और छाया रखें; {concern} पर ध्यान दें।",
+            "अगले टीकाकरण या कृमिनाशक की तारीख स्थानीय पशु स्वास्थ्यकर्मी के साथ लिख लें।",
+            "अगर पशु खाना छोड़ दे, तेज बुखार हो या खड़ा न हो पाए, तो तुरंत पशु चिकित्सक से संपर्क करें।",
+        ],
+        "te": [
+            "{animals}కు శుభ్రమైన నీరు, నీడ అందించండి; {concern}పై శ్రద్ధ వహించండి.",
+            "తదుపరి టీకా లేదా పురుగుల మందు తేదీని స్థానిక పశువైద్య సిబ్బందితో నమోదు చేసుకోండి.",
+            "జంతువు తినకపోతే, ఎక్కువ జ్వరం ఉంటే లేదా నిలబడలేకపోతే వెంటనే పశువైద్యుడిని సంప్రదించండి.",
+        ],
+    },
+    "irrigation": {
+        "hi": [
+            "{source} से {crop} की सिंचाई के लिए पंप चलाने से पहले स्थानीय पानी की बारी जांचें।",
+            "{equipment} चलाने से पहले तार, अर्थिंग, पाइप और रिसाव जांचें।",
+            "संभव हो तो सुबह जल्दी या शाम को पानी दें ताकि पानी की बचत हो।",
+        ],
+        "te": [
+            "{source} ద్వారా {crop}కు నీరు పెట్టే ముందు స్థానిక నీటి వంతును తనిఖీ చేయండి.",
+            "{equipment} ఉపయోగించే ముందు కేబుళ్లు, ఎర్తింగ్, పైపులు, లీకేజీలను తనిఖీ చేయండి.",
+            "సాధ్యమైనప్పుడు ఉదయం లేదా సాయంత్రం నీరు పెట్టి నీటి ఆవిరీభవనాన్ని తగ్గించండి.",
+        ],
+    },
+    "livelihoods": {
+        "hi": [
+            "{work} के लिए आजीविका सूचना: प्रमाणित अवसरों के लिए पंचायत और कौशल केंद्र के सूचना बोर्ड देखें।",
+            "{need} के लिए दस्तावेज देने या शुल्क भरने से पहले सरकारी बैंक या पंजीकृत केंद्र से पुष्टि करें।",
+            "अपनी आय की सुरक्षा के लिए काम, भुगतान और ग्राहक के ऑर्डर का सरल रिकॉर्ड रखें।",
+        ],
+        "te": [
+            "{work}కు జీవనోపాధి సమాచారం: ధృవీకరించిన అవకాశాల కోసం పంచాయతీ, నైపుణ్య కేంద్ర నోటీసులు చూడండి.",
+            "{need} కోసం పత్రాలు ఇవ్వడానికి లేదా రుసుము చెల్లించడానికి ముందు ప్రభుత్వ బ్యాంకు లేదా నమోదిత కేంద్రంతో నిర్ధారించండి.",
+            "మీ ఆదాయాన్ని కాపాడుకోవడానికి పని, చెల్లింపులు, కస్టమర్ ఆర్డర్లను నమోదు చేసుకోండి.",
+        ],
+    },
+    "women": {
+        "hi": [
+            "{interest} के लिए महिला सहायता सूचना: अगली स्थानीय सेवा तारीख ASHA, ANM, आंगनवाड़ी या पंचायत कार्यकर्ता से पूछें।",
+            "{group} जैसे स्वयं सहायता समूह के लिए बैठक, बचत और ऋण का रिकॉर्ड सुरक्षित रखें।",
+            "तत्काल खतरे या हिंसा में किसी भरोसेमंद व्यक्ति और आधिकारिक सहायता सेवा से संपर्क करें।",
+        ],
+        "te": [
+            "{interest} కోసం మహిళా సహాయ సమాచారం: తదుపరి స్థానిక సేవ తేదీని ఆశా, ఏఎన్ఎం, అంగన్‌వాడీ లేదా పంచాయతీ సిబ్బందిని అడగండి.",
+            "{group} వంటి స్వయం సహాయక సంఘం సమావేశాలు, పొదుపు, రుణ రికార్డులను సురక్షితంగా ఉంచండి.",
+            "తక్షణ ప్రమాదం లేదా హింసలో నమ్మకమైన వ్యక్తిని, అధికారిక సహాయ సేవను సంప్రదించండి.",
+        ],
+    },
+    "health": {
+        "hi": [
+            "{topic}, खासकर {age_group} के लिए स्वास्थ्य सूचना: तारीख सरकारी स्वास्थ्य केंद्र या ASHA कार्यकर्ता से पक्की करें।",
+            "सांस लेने में गंभीर परेशानी, सीने में दर्द, अधिक रक्तस्राव, बेहोशी या गंभीर चोट में इलाज में देरी न करें।",
+            "दवाइयों और टीकाकरण के रिकॉर्ड साथ रखें और निजी स्वास्थ्य जानकारी सार्वजनिक न करें।",
+        ],
+        "te": [
+            "{topic}, ముఖ్యంగా {age_group} కోసం ఆరోగ్య సమాచారం: తేదీలను ప్రభుత్వ ఆరోగ్య కేంద్రం లేదా ఆశా సిబ్బందితో నిర్ధారించండి.",
+            "తీవ్రమైన శ్వాస ఇబ్బంది, ఛాతీ నొప్పి, అధిక రక్తస్రావం, స్పృహ కోల్పోవడం లేదా తీవ్రమైన గాయంలో చికిత్స ఆలస్యం చేయకండి.",
+            "మందులు, టీకా రికార్డులను కలిసి ఉంచండి; వ్యక్తిగత ఆరోగ్య వివరాలను బహిరంగంగా పంచుకోకండి.",
+        ],
+    },
+    "education": {
+        "hi": [
+            "{learner} के लिए शिक्षा सूचना: {need} की जानकारी स्कूल या आधिकारिक पोर्टल पर देखें।",
+            "छात्रवृत्ति और अंतिम तारीख के लिए शिक्षक या शिक्षा कार्यालय से पूछें; अप्रमाणित एजेंट को पैसे न दें।",
+            "नियमित पढ़ाई का समय तय करें और स्कूल के दस्तावेज व आवेदन नंबर सुरक्षित रखें।",
+        ],
+        "te": [
+            "{learner} కోసం విద్యా సమాచారం: {need} వివరాలను పాఠశాల లేదా అధికారిక పోర్టల్‌లో చూడండి.",
+            "స్కాలర్‌షిప్‌లు, చివరి తేదీల కోసం ఉపాధ్యాయుడిని లేదా విద్యా కార్యాలయాన్ని అడగండి; ధృవీకరించని ఏజెంట్‌కు డబ్బు ఇవ్వకండి.",
+            "నిరంతర చదువు సమయాన్ని కేటాయించి పాఠశాల పత్రాలు, దరఖాస్తు నంబర్లను భద్రంగా ఉంచండి.",
+        ],
+    },
+    "public_services": {
+        "hi": [
+            "{ward} में {service} की सार्वजनिक सेवा सूचना: नवीनतम सूचना पंचायत कार्यालय से पक्की करें।",
+            "आवेदन की रसीद और पावती नंबर रखें; सरकारी सेवा के लिए अनधिकृत शुल्क न दें।",
+            "असुरक्षित सड़क, बिजली या पानी की समस्या आधिकारिक शिकायत माध्यम से बताएं।",
+        ],
+        "te": [
+            "{ward}లో {service} ప్రజా సేవ సమాచారం: తాజా ప్రకటనను పంచాయతీ కార్యాలయంలో నిర్ధారించండి.",
+            "దరఖాస్తు రసీదు, స్వీకరణ నంబర్లను ఉంచండి; ప్రభుత్వ సేవలకు అనధికార రుసుము చెల్లించకండి.",
+            "ప్రమాదకర రహదారులు, విద్యుత్ లేదా నీటి సమస్యలను అధికారిక ఫిర్యాదు మార్గంలో తెలియజేయండి.",
+        ],
+    },
+    "village_updates": {
+        "hi": [
+            "{interests} के लिए गांव की सूचना: प्रमाणित पंचायत, स्कूल, स्वास्थ्य केंद्र और विभागीय नोटिस देखें।",
+            "संदेश आगे भेजने से पहले तारीख और स्रोत जांचें; अफवाह या अप्रमाणित आपात सूचना न भेजें।",
+            "जरूरी स्थानीय हेल्पलाइन नंबर सुरक्षित रखें और केवल प्रमाणित जरूरी सूचना साझा करें।",
+        ],
+        "te": [
+            "{interests} కోసం గ్రామ సమాచారం: ధృవీకరించిన పంచాయతీ, పాఠశాల, ఆరోగ్య కేంద్రం, శాఖల ప్రకటనలను చూడండి.",
+            "సందేశాన్ని పంపే ముందు తేదీ, మూలాన్ని తనిఖీ చేయండి; పుకార్లు లేదా ధృవీకరించని అత్యవసర సమాచారాన్ని పంపకండి.",
+            "ముఖ్యమైన స్థానిక హెల్ప్‌లైన్ నంబర్లను భద్రపరచి ధృవీకరించిన అత్యవసర సమాచారాన్ని మాత్రమే పంచుకోండి.",
+        ],
+    },
+}
+
+
 def _paths(folder: Path) -> tuple[Path, Path]:
     data_dir = folder / "data"
     data_dir.mkdir(exist_ok=True)
-    return data_dir / "profiles.json", data_dir / "outbox.log"
+    return data_dir / f"{folder.name}.xlsx", data_dir / "outbox.log"
+
+
+PROFILE_HEADERS = [
+    "ID", "Name", "Location", "Phone", "Channel", "Language", "LastSent",
+    "Animals", "Count", "Concern", "Source", "Crop", "Equipment", "Work",
+    "Need", "Interest", "Group", "Topic", "AgeGroup", "Learner", "Service",
+    "Ward", "Interests",
+]
+DELIVERY_HEADERS = ["Timestamp", "ProfileID", "Name", "Location", "Phone", "Channel", "Language", "Message", "Status"]
+
+
+def _profile_values(profile: dict) -> list:
+    values = []
+    for header in PROFILE_HEADERS:
+        key = "last_sent" if header == "LastSent" else header.lower()
+        values.append(profile.get(key))
+    return values
+
+
+def _ensure_workbook(path: Path) -> None:
+    if path.exists():
+        return
+    workbook = Workbook()
+    profiles = workbook.active
+    profiles.title = "Profiles"
+    profiles.append(PROFILE_HEADERS)
+    deliveries = workbook.create_sheet("DeliveryLog")
+    deliveries.append(DELIVERY_HEADERS)
+    legacy = path.with_name("profiles.json")
+    if legacy.exists():
+        try:
+            for item in json.loads(legacy.read_text(encoding="utf-8")):
+                profiles.append(_profile_values(item))
+        except (OSError, json.JSONDecodeError):
+            pass
+    workbook.save(path)
 
 
 def _load(path: Path) -> list[dict]:
-    if not path.exists():
-        return []
-    return json.loads(path.read_text(encoding="utf-8"))
+    _ensure_workbook(path)
+    workbook = load_workbook(path, read_only=True)
+    sheet = workbook["Profiles"]
+    headers = [cell.value for cell in sheet[1]]
+    profiles = []
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+        if row[0] is None:
+            continue
+        profile = {}
+        for header, value in zip(headers, row):
+            key = "last_sent" if header == "LastSent" else header.lower()
+            profile[key] = value
+        profiles.append(profile)
+    workbook.close()
+    return profiles
+
+
+def _save_profiles(path: Path, profiles: list[dict]) -> None:
+    workbook = load_workbook(path)
+    sheet = workbook["Profiles"]
+    sheet.delete_rows(2, sheet.max_row)
+    for profile in profiles:
+        sheet.append(_profile_values(profile))
+    workbook.save(path)
+
+
+def _log_delivery(path: Path, profile: dict, message: str, timestamp: str) -> None:
+    workbook = load_workbook(path)
+    workbook["DeliveryLog"].append([
+        timestamp, profile["id"], profile["name"], profile["location"],
+        profile["phone"], profile["channel"], profile["language"], message, "dry-run-sent",
+    ])
+    workbook.save(path)
 
 
 def register(domain: str, folder: Path) -> None:
@@ -107,16 +280,60 @@ def register(domain: str, folder: Path) -> None:
     for key, prompt in definition["fields"]:
         profile[key] = input(prompt).strip()
     profiles.append(profile)
-    profiles_file.write_text(json.dumps(profiles, indent=2), encoding="utf-8")
+    _save_profiles(profiles_file, profiles)
     print(f"Saved {definition['title']} profile #{profile['id']}. Run main.py to send updates.")
 
 
 def _message(domain: str, profile: dict) -> str:
     definition = DOMAIN_DEFINITIONS[domain]
-    greeting = {"hindi": "Namaste", "telugu": "Namaskaram"}.get(profile["language"], "Hello")
-    lines = [f"{greeting} {profile['name']} ({profile['location']}), VillageNova {definition['title']} daily update:"]
-    lines.extend(message.format(**profile) for message in definition["messages"])
+    language = profile.get("language", "english").lower()
+    language = {"hindi": "hi", "telugu": "te", "english": "en"}.get(language, language)
+    greeting = {"hi": "नमस्ते", "te": "నమస్కారం"}.get(language, "Hello")
+    title = {"hi": "दैनिक अपडेट", "te": "రోజువారీ సమాచారం"}.get(language, f"{definition['title']} daily update")
+    templates = definition["messages"] if language == "en" else LOCALIZED_MESSAGES[domain].get(language, definition["messages"])
+    lines = [f"{greeting} {profile['name']} ({profile['location']}), VillageNova {title}:"]
+    lines.extend(message.format(**profile) for message in templates)
     return "\n".join(lines)
+
+
+def _generated_message(domain: str, profile: dict) -> str | None:
+    """Generate a fresh message when an OpenAI-compatible API is configured."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    local_provider = "localhost" in base_url or "127.0.0.1" in base_url
+    if not api_key and not local_provider:
+        return None
+    language = profile.get("language", "english")
+    details = ", ".join(
+        f"{key}={value}" for key, value in profile.items()
+        if key not in {"id", "phone", "channel", "last_sent"} and value
+    )
+    prompt = (
+        f"Create one concise, practical {domain} village update for this resident: {details}. "
+        f"Write entirely in {language}. Use the resident's name and location. "
+        "Give 3 short actionable points. Do not invent dates, prices, schemes, phone numbers, "
+        "or official claims. Tell the resident to verify local information with the relevant "
+        "official worker or office. Do not use markdown headings."
+    )
+    try:
+        response = requests.post(
+            base_url + "/chat/completions",
+            headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {api_key}"} if api_key else {})},
+            json={
+                "model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                "temperature": 0.8,
+                "messages": [
+                    {"role": "system", "content": "You write safe, local, useful village service messages."},
+                    {"role": "user", "content": prompt},
+                ],
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+        content = response.json()["choices"][0]["message"]["content"].strip()
+        return content or None
+    except (requests.RequestException, KeyError, IndexError, TypeError, ValueError):
+        return None
 
 
 def run(domain: str, folder: Path) -> None:
@@ -126,14 +343,16 @@ def run(domain: str, folder: Path) -> None:
     if not profiles:
         print("No profiles registered. Run agent.py first.")
         return
+    send_every_run = os.getenv("SEND_EVERY_RUN", "false").lower() == "true"
     for profile in profiles:
-        if profile.get("last_sent") and datetime.now() - datetime.fromisoformat(profile["last_sent"]) < timedelta(hours=24):
+        if not send_every_run and profile.get("last_sent") and datetime.now() - datetime.fromisoformat(profile["last_sent"]) < timedelta(hours=24):
             print(f"{profile['name']}: skipped (message sent within 24 hours).")
             continue
-        message = _message(domain, profile)
+        message = _generated_message(domain, profile) or _message(domain, profile)
         timestamp = datetime.now().isoformat(timespec="seconds")
         with outbox_file.open("a", encoding="utf-8") as stream:
             stream.write(f"[{timestamp}] {profile['channel'].upper()} -> {profile['phone']}: {message}\n")
+        _log_delivery(profiles_file, profile, message, timestamp)
         profile["last_sent"] = timestamp
         print(f"[DRY RUN] {profile['channel'].upper()} to {profile['phone']}:\n{message}\n")
-    profiles_file.write_text(json.dumps(profiles, indent=2), encoding="utf-8")
+    _save_profiles(profiles_file, profiles)

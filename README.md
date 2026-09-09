@@ -62,8 +62,12 @@ mixing their logic into the hub.
 ## Run an individual agent
 
 Every non-farmer domain has its own `agent.py` and `main.py`. Registration is
-stored separately for that department, and its daily messages are written to
-that department's `data/outbox.log`.
+stored separately for that department in `data/<agent-name>.xlsx`, with a
+`Profiles` sheet for registrations and a `DeliveryLog` sheet for sent
+messages. Each department also writes its own `data/outbox.log`; no agent
+shares another agent's profile or outbox. Hindi and Telugu registrations
+receive localized message templates with their saved name, location, and
+domain details included.
 
 Example for cattle owners:
 
@@ -76,7 +80,21 @@ cd cattle_agent
 The same pattern works in `irrigation_agent`, `livelihoods_agent`,
 `women_support`, `health_agent`, `education_agent`, `public_services_agent`,
 and `village_updates`. Each agent asks domain-specific questions and sends
-only that department's updates to its own registered profiles.
+only that department's updates to its own registered profiles. Existing
+`profiles.json` files are imported into the department workbook the first time
+the agent runs after this change.
+
+To generate a fresh message on every delivery for free, install Ollama, run
+`ollama pull llama3.2`, and copy `krishi_agent/.env.example` to
+`krishi_agent/.env`. The default configuration uses Ollama locally at
+`http://localhost:11434/v1` and does not need an API key. You can instead set
+`OPENAI_API_KEY`, `OPENAI_MODEL`, and `OPENAI_BASE_URL` for a paid or hosted
+OpenAI-compatible provider. Without a reachable provider, agents use the
+verified fallback messages. The farmer module keeps its rule-based weather
+and mandi advisories so safety recommendations remain grounded in actual
+conditions.
+The normal 24-hour delivery gate remains enabled; set `SEND_EVERY_RUN=true`
+in `.env` when testing and you need a new generated message on every run.
 
 ## Safety and privacy
 
