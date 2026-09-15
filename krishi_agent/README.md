@@ -38,8 +38,7 @@ main.py ──reads farmers, then for each one:──┘
    ```
    pip install -r requirements.txt
    ```
-4. Copy `.env.example` to `.env`. Leave `MOCK_MODE=true` for now — nothing
-   below requires an internet connection or an account yet.
+4. Copy `.env.example` to `.env` and add an OpenWeather API key.
 
 ## Try it
 
@@ -53,13 +52,13 @@ what you registered, and `DeliveryLog` with what was generated for each.
 `data/outbox.log` has the same messages in plain text.
 
 Run `main.py` again within 24 hours and a farmer is skipped automatically;
-after 24 hours, each farmer receives a new personalized message. Mock
-weather and prices are seeded by village/crop + date, so demos are repeatable.
+after 24 hours, each farmer receives a new personalized message.
 
 ## Going live
 
-1. **Weather:** get a free key at openweathermap.org, add it to
-   `OPENWEATHER_API_KEY` in `.env`.
+1. **Weather:** get a free key at openweathermap.org and add it to
+   `OPENWEATHER_API_KEY` in `.env`. Weather is live and fails clearly when the
+   key is missing or the API is unavailable; it does not use mock data.
    *Note: the free tier's cloud-cover % is used as a rough stand-in for
    rain probability — for a real probability figure, move to the One
    Call API (still free tier) or IMD's own data feed.*
@@ -74,12 +73,13 @@ weather and prices are seeded by village/crop + date, so demos are repeatable.
 4. **GPS location:** registration asks only for a village, town, or district.
    In live mode, that place is resolved through OpenWeather geocoding when
    its key is present, otherwise OpenStreetMap Nominatim is used.
-5. Set `MOCK_MODE=false` in `.env`. Re-run `main.py`.
+5. Set `MOCK_MODE=false` in `.env` when you are ready to enable the other
+   live providers. Re-run `main.py`.
 
 ## Known simplifications, on purpose
 
-- Weather and mandi data fall back to deterministic mock values until you
-   add real keys — this keeps the pipeline testable and demoable with zero setup.
+- Mandi data can still use deterministic mock values until its provider is
+   configured. Weather always comes from OpenWeather once its key is set.
 - Messaging defaults to a dry run (logs only) so you can't accidentally
   spend money or spam a real phone number while developing.
 - The registration and advisory agents are transparent rule-based flows:
