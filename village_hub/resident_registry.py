@@ -1,7 +1,9 @@
 """Excel-backed resident registry and per-resident delivery history."""
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
+from zipfile import BadZipFile
 
 from openpyxl import Workbook, load_workbook
 
@@ -30,10 +32,7 @@ CATEGORIES = {
 }
 
 
-def _ensure_workbook() -> None:
-    DATA_DIR.mkdir(exist_ok=True)
-    if RESIDENTS_FILE.exists():
-        return
+def _create_workbook() -> None:
     workbook = Workbook()
     residents = workbook.active
     residents.title = "Residents"
@@ -41,7 +40,25 @@ def _ensure_workbook() -> None:
     delivery_log = workbook.create_sheet("DeliveryLog")
     delivery_log.append(DELIVERY_HEADERS)
     workbook.save(RESIDENTS_FILE)
-    _migrate_legacy_json()
+
+
+def _ensure_workbook() -> None:
+    DATA_DIR.mkdir(exist_ok=True)
+    if not RESIDENTS_FILE.exists():
+        _create_workbook()
+        _migrate_legacy_json()
+        return
+    try:
+        workbook = load_workbook(RESIDENTS_FILE, read_only=True)
+        workbook.close()
+    except (BadZipFile, OSError):
+        backup = RESIDENTS_FILE.with_name(
+            f"{RESIDENTS_FILE.stem}.corrupt-{datetime.now():%Y%m%d-%H%M%S}{RESIDENTS_FILE.suffix}"
+        )
+        shutil.move(RESIDENTS_FILE, backup)
+        print(f"[resident_registry] Invalid workbook moved to {backup.name}; rebuilding it.")
+        _create_workbook()
+        _migrate_legacy_json()
 
 
 def _migrate_legacy_json() -> None:
@@ -56,10 +73,15 @@ def _migrate_legacy_json() -> None:
     workbook = load_workbook(RESIDENTS_FILE)
     sheet = workbook["Residents"]
     for resident in legacy_residents:
+        name = resident.get("name") or resident.get("nae") or "Unknown resident"
+        categories = [
+            category if category in CATEGORIES else "general"
+            for category in resident.get("categories", [])
+        ]
         sheet.append([
-            resident["id"], resident["name"], resident["location"],
+            resident["id"], name, resident["location"],
             resident["phone"], resident["channel"], resident["language"],
-            ",".join(resident.get("categories", [])), resident.get("last_sent"),
+            ",".join(sorted(set(categories))), resident.get("last_sent"),
         ])
     workbook.save(RESIDENTS_FILE)
 

@@ -18,9 +18,9 @@ Krishisetu/
   village_hub/        Shared resident registry and daily digest runner
 ```
 
-`krishi_agent` remains the completed Krishi Setu farmer module. The other folders are
-separate domain modules, and `village_hub` combines their updates for each
-resident according to the work and interests they selected.
+`krishi_agent` remains the farmer domain module. The other folders are
+separate domain modules, and `village_hub` is the only cross-domain
+orchestrator and runtime data owner.
 
 ## Run the village-wide prototype
 
@@ -33,8 +33,14 @@ cd village_hub
 ```
 
 The prototype uses mock updates and a dry-run outbox by default. It does not
-send real messages. Resident data is stored in
-`village_hub/data/residents.xlsx`:
+send real messages. All runtime data is stored in `village_hub/data/`:
+
+- `residents.xlsx` is the canonical village registry and hub delivery log.
+- `farmers.xlsx`, `cattle.xlsx`, and the other domain workbooks contain only
+  domain-specific member details and delivery logs.
+- `*_outbox.log` files contain dry-run output for the relevant domain.
+
+The canonical resident workbook has:
 
 - `Residents`: one row per registered resident and their selected domains.
 - `DeliveryLog`: one row per personalized message sent to each resident.
@@ -54,18 +60,19 @@ Supported categories are `farmer`, `cattle`, `irrigation`, `livelihoods`,
 
 Schedule `village_hub/main.py` with Windows Task Scheduler once per day. The
 hub keeps a 24-hour delivery gate per resident, matching the farmer module.
-Each resident is processed separately and receives only their selected domain
-updates; no resident receives another resident's selected categories.
+Each resident is processed separately and receives one digest assembled from
+their selected domain agents; no resident receives another resident's selected
+categories. The dashboard's forced send is for development only.
 Future live integrations can be added inside each domain folder without
 mixing their logic into the hub.
 
 ## Run an individual agent
 
 Every non-farmer domain has its own `agent.py` and `main.py`. Registration is
-stored separately for that department in `data/<agent-name>.xlsx`, with a
-`Profiles` sheet for registrations and a `DeliveryLog` sheet for sent
-messages. Each department also writes its own `data/outbox.log`; no agent
-shares another agent's profile or outbox. Hindi and Telugu registrations
+stored separately for that department in `village_hub/data/<agent-name>.xlsx`,
+with a `Profiles` sheet for registrations and a `DeliveryLog` sheet for sent
+messages. Each department also writes its own outbox log; no agent shares
+another agent's profile or outbox. Hindi and Telugu registrations
 receive localized message templates with their saved name, location, and
 domain details included.
 
@@ -77,12 +84,12 @@ cd cattle_agent
 ..\krishi_agent\.venv\Scripts\python.exe main.py
 ```
 
-The same pattern works in `irrigation_agent`, `livelihoods_agent`,
+The same registration pattern works in `irrigation_agent`, `livelihoods_agent`,
 `women_support`, `health_agent`, `education_agent`, `public_services_agent`,
-and `village_updates`. Each agent asks domain-specific questions and sends
-only that department's updates to its own registered profiles. Existing
-`profiles.json` files are imported into the department workbook the first time
-the agent runs after this change.
+and `village_updates`. Each agent asks domain-specific questions and stores
+only that department's member details in `village_hub/data/`. For a
+cross-domain delivery, use `village_hub/main.py`; it is the single command
+that processes the canonical hub residents.
 
 To generate a fresh message on every delivery for free, install Ollama, run
 `ollama pull llama3.2`, and copy `krishi_agent/.env.example` to

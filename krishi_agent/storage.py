@@ -9,26 +9,47 @@ Swap this module out for a real database later (SQLite/Postgres) without
 touching agent.py or main.py — they only call the functions below.
 """
 import os
+import shutil
 from datetime import datetime
+from pathlib import Path
+from zipfile import BadZipFile
 from openpyxl import Workbook, load_workbook
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+DATA_DIR = str(Path(__file__).parents[1] / "village_hub" / "data")
 FARMERS_FILE = os.path.join(DATA_DIR, "farmers.xlsx")
 
 FARMER_HEADERS = ["ID", "Name", "Village", "Crop", "Stage", "Language", "Phone", "Channel", "Latitude", "Longitude", "LocationSource"]
 LOG_HEADERS = ["Timestamp", "FarmerID", "Farmer", "Village", "Channel", "Message", "Status"]
 
 
+def _create_workbook():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Farmers"
+    ws.append(FARMER_HEADERS)
+    log_ws = wb.create_sheet("DeliveryLog")
+    log_ws.append(LOG_HEADERS)
+    wb.save(FARMERS_FILE)
+
+
 def _ensure_workbook():
     os.makedirs(DATA_DIR, exist_ok=True)
     if not os.path.exists(FARMERS_FILE):
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Farmers"
-        ws.append(FARMER_HEADERS)
-        log_ws = wb.create_sheet("DeliveryLog")
-        log_ws.append(LOG_HEADERS)
-        wb.save(FARMERS_FILE)
+        legacy_file = os.path.join(os.path.dirname(__file__), "data", "farmers.xlsx")
+        if os.path.exists(legacy_file):
+            shutil.copy2(legacy_file, FARMERS_FILE)
+            print(f"[storage] Migrated {legacy_file} to {FARMERS_FILE}.")
+            return
+        _create_workbook()
+        return
+    try:
+        wb = load_workbook(FARMERS_FILE, read_only=True)
+        wb.close()
+    except (BadZipFile, OSError):
+        backup = os.path.splitext(FARMERS_FILE)[0] + f".corrupt-{datetime.now():%Y%m%d-%H%M%S}.xlsx"
+        shutil.move(FARMERS_FILE, backup)
+        print(f"[storage] Invalid workbook moved to {os.path.basename(backup)}; rebuilding it.")
+        _create_workbook()
 
 
 def _ensure_headers(ws, headers: list[str]):

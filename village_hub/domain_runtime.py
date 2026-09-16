@@ -1,6 +1,7 @@
 """Runtime shared by the independently runnable village domain agents."""
 import json
 import os
+import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -13,9 +14,15 @@ load_dotenv(Path(__file__).parents[1] / "krishi_agent" / ".env")
 DOMAIN_DEFINITIONS = {
     "cattle": {
         "title": "Cattle Agent",
-        "fields": [("animals", "Animals (cow/buffalo/goat/sheep): "), ("count", "Approximate number of animals: "), ("concern", "Main concern (fodder/health/milk/vaccination): ")],
+        "fields": [
+            ("cattle_type", "Which type of cattle (cow/buffalo/goat/sheep): "),
+            ("animals", "Animals (cow/buffalo/goat/sheep): "),
+            ("count", "Approximate number of animals: "),
+            ("concern", "Main concern (fodder/health/milk/vaccination): "),
+        ],
         "messages": [
-            "Keep clean water and shade available for {animals}; monitor {concern} closely.",
+            "For {cattle_type} animals, keep clean water and shade available; monitor {concern} closely.",
+            "Use a balanced feed plan: green fodder, dry roughage, and mineral support. For nutrition, focus on roughage and clean water before supplements.",
             "Record the next vaccination or deworming date with your local veterinary worker.",
             "If an animal stops eating, has high fever, or cannot stand, contact a veterinarian promptly.",
         ],
@@ -84,6 +91,11 @@ DOMAIN_DEFINITIONS = {
         ],
     },
 }
+
+FARMER_UPDATE = (
+    "Farmer update: check today's weather and crop conditions before field work. "
+    "Use the Krishi Setu advisory for crop-specific guidance."
+)
 
 
 LOCALIZED_MESSAGES = {
@@ -186,26 +198,63 @@ LOCALIZED_MESSAGES = {
 }
 
 
+HUB_DATA_DIR = Path(__file__).parent / "data"
+
+
 def _paths(folder: Path) -> tuple[Path, Path]:
-    data_dir = folder / "data"
+    data_dir = HUB_DATA_DIR
     data_dir.mkdir(exist_ok=True)
-    return data_dir / f"{folder.name}.xlsx", data_dir / "outbox.log"
+    workbook = data_dir / f"{folder.name}.xlsx"
+    legacy_workbook = folder / "data" / workbook.name
+    if not workbook.exists() and legacy_workbook.exists():
+        shutil.copy2(legacy_workbook, workbook)
+        print(f"[domain_runtime] Migrated {legacy_workbook} to {workbook}.")
+    return workbook, data_dir / f"{folder.name}_outbox.log"
 
 
 PROFILE_HEADERS = [
     "ID", "Name", "Location", "Phone", "Channel", "Language", "LastSent",
-    "Animals", "Count", "Concern", "Source", "Crop", "Equipment", "Work",
+    "CattleType", "Animals", "Count", "Concern", "Source", "Crop", "Equipment", "Work",
     "Need", "Interest", "Group", "Topic", "AgeGroup", "Learner", "Service",
     "Ward", "Interests",
 ]
 DELIVERY_HEADERS = ["Timestamp", "ProfileID", "Name", "Location", "Phone", "Channel", "Language", "Message", "Status"]
 
 
+def _normalized_key(header: str) -> str:
+    alias_map = {
+        "ID": "id",
+        "Name": "name",
+        "Location": "location",
+        "Phone": "phone",
+        "Channel": "channel",
+        "Language": "language",
+        "LastSent": "last_sent",
+        "CattleType": "cattle_type",
+        "Animals": "animals",
+        "Count": "count",
+        "Concern": "concern",
+        "Source": "source",
+        "Crop": "crop",
+        "Equipment": "equipment",
+        "Work": "work",
+        "Need": "need",
+        "Interest": "interest",
+        "Group": "group",
+        "Topic": "topic",
+        "AgeGroup": "age_group",
+        "Learner": "learner",
+        "Service": "service",
+        "Ward": "ward",
+        "Interests": "interests",
+    }
+    return alias_map.get(header, header.lower())
+
+
 def _profile_values(profile: dict) -> list:
     values = []
     for header in PROFILE_HEADERS:
-        key = "last_sent" if header == "LastSent" else header.lower()
-        values.append(profile.get(key))
+        values.append(profile.get(_normalized_key(header)))
     return values
 
 
@@ -218,7 +267,7 @@ def _ensure_workbook(path: Path) -> None:
     profiles.append(PROFILE_HEADERS)
     deliveries = workbook.create_sheet("DeliveryLog")
     deliveries.append(DELIVERY_HEADERS)
-    legacy = path.with_name("profiles.json")
+    legacy = path.with_name(f"{path.stem}.json")
     if legacy.exists():
         try:
             for item in json.loads(legacy.read_text(encoding="utf-8")):
@@ -239,8 +288,7 @@ def _load(path: Path) -> list[dict]:
             continue
         profile = {}
         for header, value in zip(headers, row):
-            key = "last_sent" if header == "LastSent" else header.lower()
-            profile[key] = value
+            profile[_normalized_key(header)] = value
         profiles.append(profile)
     workbook.close()
     return profiles
@@ -291,9 +339,25 @@ def _message(domain: str, profile: dict) -> str:
     greeting = {"hi": "नमस्ते", "te": "నమస్కారం"}.get(language, "Hello")
     title = {"hi": "दैनिक अपडेट", "te": "రోజువారీ సమాచారం"}.get(language, f"{definition['title']} daily update")
     templates = definition["messages"] if language == "en" else LOCALIZED_MESSAGES[domain].get(language, definition["messages"])
+    if domain == "cattle":
+        from cattle_agent.nutrition_guide import get_nutrition_plan
+        nutrition_note = get_nutrition_plan(profile.get("cattle_type") or profile.get("animals") or "cow", profile.get("concern") or "general")
+        templates = list(templates)
+        templates.insert(1, f"Feeding note: {nutrition_note}")
     lines = [f"{greeting} {profile['name']} ({profile['location']}), VillageNova {title}:"]
     lines.extend(message.format(**profile) for message in templates)
     return "\n".join(lines)
+
+
+def message_for(domain: str, resident: dict) -> str:
+    """Compose a domain update from a hub resident without storing hub data here."""
+    if domain == "farmer":
+        return FARMER_UPDATE
+    profile = dict(resident)
+    profile.setdefault("location", "your village")
+    for key, _ in DOMAIN_DEFINITIONS[domain]["fields"]:
+        profile.setdefault(key, "your local area")
+    return _message(domain, profile)
 
 
 def _generated_message(domain: str, profile: dict) -> str | None:

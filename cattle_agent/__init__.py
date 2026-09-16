@@ -1,0 +1,1 @@
+"""Cattle agent package."""

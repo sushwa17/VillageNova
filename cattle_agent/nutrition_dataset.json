@@ -1,0 +1,50 @@
+{
+  "cow": {
+    "milk": [
+      "Green fodder like napier, maize, sorghum, and hybrid bajra",
+      "Dry roughage such as wheat straw or paddy straw",
+      "Mineral mixture and clean drinking water"
+    ],
+    "general": [
+      "Green fodder and dry roughage as the main feed",
+      "Measured concentrate feed based on body condition",
+      "Mineral salt, shade, and clean water every day"
+    ]
+  },
+  "buffalo": {
+    "milk": [
+      "Good-quality green fodder and legume fodder",
+      "Balanced concentrate mix and mineral supplements",
+      "Consistent access to clean water and shade"
+    ],
+    "general": [
+      "Green fodder with dry roughage as the base diet",
+      "Controlled concentrate feeding and mineral support",
+      "Clean pen, water, and rest management"
+    ]
+  },
+  "goat": {
+    "milk": [
+      "Good green fodder, browse leaves, and roughage",
+      "Protein-rich concentrate when needed",
+      "Fresh water and mineral supplementation"
+    ],
+    "general": [
+      "Mixed roughage and green fodder with a small grain ration",
+      "Fresh water and minerals at all times",
+      "Avoid moldy or sudden changes in feed"
+    ]
+  },
+  "sheep": {
+    "milk": [
+      "Good roughage and green fodder",
+      "Careful concentrate feeding for milk production",
+      "Mineral salts and clean water"
+    ],
+    "general": [
+      "Roughage-based diet with limited concentrate",
+      "Daily mineral and water access",
+      "Avoid overgrazing and dusty feed"
+    ]
+  }
+}

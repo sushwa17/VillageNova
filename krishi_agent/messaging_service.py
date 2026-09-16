@@ -14,7 +14,7 @@ setup/verification) — this module is the one place you'd change.
 import os
 from datetime import datetime
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "village_hub", "data")
 OUTBOX_LOG = os.path.join(DATA_DIR, "outbox.log")
 
 
