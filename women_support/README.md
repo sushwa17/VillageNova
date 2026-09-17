@@ -6,3 +6,7 @@ cd "C:\Users\sushw\Downloads\Krishisetu\village_hub"
 Owns optional women-focused information: health camps, self-help groups,
 training, safety contacts, childcare, and eligible government schemes.
 Messages must be respectful, consent-based, and sent only to opted-in users.
+
+The daily support flow now asks what kind of support is needed and gives more
+specific, practical guidance for health, SHG support, training, safety, and
+childcare.

@@ -1,7 +1,12 @@
 # Cattle Agent
 
 Owns cattle-owner profiles and animal-care advisories: vaccination reminders,
-heat stress, fodder, clean water, and local veterinary notices.
+heat stress, fodder, clean water, cattle-type selection, and local veterinary
+notices.
 
-The shared `village_hub` currently sends a mock daily cattle update. Add live
-veterinary or livestock-department APIs here when the pilot district is known.
+The agent now asks which cattle type the resident keeps and includes simple
+nutrition guidance for cow, buffalo, goat, and sheep. Messages are designed to
+feel practical and easy to read in a daily village update.
+
+The shared `village_hub` can send these updates in dry-run mode while the
+project remains mock-first for local testing.

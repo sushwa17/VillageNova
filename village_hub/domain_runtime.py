@@ -21,37 +21,52 @@ DOMAIN_DEFINITIONS = {
             ("concern", "Main concern (fodder/health/milk/vaccination): "),
         ],
         "messages": [
-            "For {cattle_type} animals, keep clean water and shade available; monitor {concern} closely.",
-            "Use a balanced feed plan: green fodder, dry roughage, and mineral support. For nutrition, focus on roughage and clean water before supplements.",
-            "Record the next vaccination or deworming date with your local veterinary worker.",
-            "If an animal stops eating, has high fever, or cannot stand, contact a veterinarian promptly.",
+            "Daily cattle tip: for {cattle_type}, keep clean water and shade ready and watch {concern} closely.",
+            "Feeding note: use green fodder, dry roughage, and mineral support; clean water comes first.",
+            "Mark the next vaccination or deworming date with your local veterinary worker.",
+            "If an animal stops eating, has high fever, or cannot stand, call a vet immediately.",
         ],
     },
     "irrigation": {
         "title": "Irrigation Agent",
-        "fields": [("source", "Water source (borewell/canal/tank/river): "), ("crop", "Main crop or area served: "), ("equipment", "Equipment (pump/drip/sprinkler/none): ")],
+        "fields": [
+            ("source", "Water source (borewell/canal/tank/river): "),
+            ("crop", "Main crop or area served: "),
+            ("irrigation_method", "Irrigation method (drip/sprinkler/flood/furrow): "),
+            ("equipment", "Equipment (pump/drip/sprinkler/none): "),
+            ("stage", "Crop stage (sowing/seedling/flowering/fruiting/maturity): "),
+        ],
         "messages": [
-            "For {source} irrigation of {crop}, check the local water turn before starting the pump.",
-            "Inspect cables, earthing, pipes, and leaks before operating {equipment}.",
-            "Water early morning or evening when possible to reduce evaporation and protect the supply.",
+            "Water update: for {crop} from {source}, check the local turn before starting the pump.",
+            "Use {irrigation_method} scheduling to match the crop stage and cut water waste.",
+            "Before running {equipment}, check cables, pipes, earthing, and leaks.",
+            "Irrigate early morning or evening when possible to reduce evaporation and save energy.",
         ],
     },
     "livelihoods": {
         "title": "Livelihoods Agent",
-        "fields": [("work", "Work or skill (driver/tailor/shop/artisan/labour/other): "), ("need", "Information needed (jobs/training/loans/market): ")],
+        "fields": [
+            ("work_type", "Work or skill (driver/tailor/shop/artisan/labour/other): "),
+            ("work", "Work or skill (driver/tailor/shop/artisan/labour/other): "),
+            ("need", "Information needed (jobs/training/loans/market): "),
+        ],
         "messages": [
-            "Livelihood update for {work}: check the panchayat and skill-centre notice boards for verified opportunities.",
-            "For {need}, use official bank, government, or registered training-centre contacts before sharing documents or paying fees.",
-            "Keep a simple record of work, payments, and customer orders to protect your income.",
+            "Livelihood note: for {work_type}, check the local panchayat and skill-centre boards for trusted work.",
+            "For {need}, compare nearby demand, wages, and verified options before paying any fee.",
+            "Keep a small record of work, payments, and customers to protect your income.",
         ],
     },
     "women": {
         "title": "Women Support Agent",
-        "fields": [("interest", "Main interest (health/SHG/training/safety/childcare): "), ("group", "Self-help group or community group (optional): ")],
+        "fields": [
+            ("support_type", "Support needed (health/SHG/training/safety/childcare): "),
+            ("interest", "Main interest (health/SHG/training/safety/childcare): "),
+            ("group", "Self-help group or community group (optional): "),
+        ],
         "messages": [
-            "Women support update for {interest}: ask the ASHA, ANM, Anganwadi, or panchayat worker about the next local service date.",
-            "For self-help groups such as {group}, keep meeting notes, savings, and loan records safely.",
-            "For immediate danger or violence, contact a trusted person and the official local emergency or support service.",
+            "Support alert: for {support_type}, ask the ASHA, ANM, Anganwadi, or panchayat worker about the next local service date.",
+            "For self-help groups like {group}, keep records of savings, meetings, and loans in a safe place.",
+            "If there is immediate danger or violence, move to safety and contact a trusted person or local emergency support.",
         ],
     },
     "health": {
@@ -65,11 +80,17 @@ DOMAIN_DEFINITIONS = {
     },
     "education": {
         "title": "Education Agent",
-        "fields": [("learner", "Learner (child/adult/student): "), ("need", "Need (school/scholarship/exam/skills/digital): ")],
+        "fields": [
+            ("school_name", "School or college name: "),
+            ("learner", "Learner (child/adult/student): "),
+            ("ai_focus", "AI topic or school innovation focus (chatbot/robotics/writing/math/project): "),
+            ("need", "Need (school/scholarship/exam/skills/digital): "),
+        ],
         "messages": [
-            "Education update for {learner}: check the school or official portal for {need} notices.",
+            "School update: {learner} at {school_name} should check the notice board or official portal for {need} updates.",
+            "AI school note: explore {ai_focus} in a practical way to build creativity, problem-solving, and digital skills.",
             "Ask the teacher or education office about scholarships and deadlines; never pay an unverified agent.",
-            "Set aside a regular study time and keep school documents and application numbers safely.",
+            "Set a daily study time and keep school records and application numbers safe.",
         ],
     },
     "public_services": {
@@ -214,8 +235,8 @@ def _paths(folder: Path) -> tuple[Path, Path]:
 
 PROFILE_HEADERS = [
     "ID", "Name", "Location", "Phone", "Channel", "Language", "LastSent",
-    "CattleType", "Animals", "Count", "Concern", "Source", "Crop", "Equipment", "Work",
-    "Need", "Interest", "Group", "Topic", "AgeGroup", "Learner", "Service",
+    "CattleType", "Animals", "Count", "Concern", "Source", "Crop", "IrrigationMethod", "Equipment", "Stage",
+    "WorkType", "Work", "Need", "Interest", "SupportType", "Group", "Topic", "AgeGroup", "SchoolName", "Learner", "AiFocus", "Service",
     "Ward", "Interests",
 ]
 DELIVERY_HEADERS = ["Timestamp", "ProfileID", "Name", "Location", "Phone", "Channel", "Language", "Message", "Status"]
@@ -236,14 +257,20 @@ def _normalized_key(header: str) -> str:
         "Concern": "concern",
         "Source": "source",
         "Crop": "crop",
+        "IrrigationMethod": "irrigation_method",
         "Equipment": "equipment",
+        "Stage": "stage",
+        "WorkType": "work_type",
         "Work": "work",
         "Need": "need",
         "Interest": "interest",
+        "SupportType": "support_type",
         "Group": "group",
         "Topic": "topic",
         "AgeGroup": "age_group",
+        "SchoolName": "school_name",
         "Learner": "learner",
+        "AiFocus": "ai_focus",
         "Service": "service",
         "Ward": "ward",
         "Interests": "interests",
@@ -344,6 +371,43 @@ def _message(domain: str, profile: dict) -> str:
         nutrition_note = get_nutrition_plan(profile.get("cattle_type") or profile.get("animals") or "cow", profile.get("concern") or "general")
         templates = list(templates)
         templates.insert(1, f"Feeding note: {nutrition_note}")
+    if domain == "irrigation":
+        from irrigation_agent.irrigation_guide import get_irrigation_plan
+        irrigation_note = get_irrigation_plan(
+            profile.get("source") or "borewell",
+            profile.get("crop") or "field crop",
+            profile.get("irrigation_method") or profile.get("equipment") or "drip",
+            profile.get("stage") or "general",
+        )
+        templates = list(templates)
+        templates.insert(2, f"Field schedule: {irrigation_note}")
+    if domain == "education":
+        from education_agent.ai_guide import get_ai_update
+        ai_note = get_ai_update(
+            profile.get("school_name") or "School",
+            profile.get("learner") or "student",
+            profile.get("ai_focus") or "AI basics",
+        )
+        templates = list(templates)
+        templates.insert(1, f"AI school update: {ai_note}")
+    if domain == "livelihoods":
+        from livelihoods_agent.livelihoods_guide import get_livelihood_update
+        livelihood_note = get_livelihood_update(
+            profile.get("work_type") or profile.get("work") or "labour",
+            profile.get("need") or "jobs",
+            profile.get("interest") or "general",
+        )
+        templates = list(templates)
+        templates.insert(1, f"Local opportunity note: {livelihood_note}")
+    if domain == "women":
+        from women_support.support_guide import get_support_update
+        support_note = get_support_update(
+            profile.get("interest") or profile.get("support_type") or "health",
+            profile.get("group") or "community group",
+            profile.get("support_type") or "safety",
+        )
+        templates = list(templates)
+        templates.insert(1, f"Support note: {support_note}")
     lines = [f"{greeting} {profile['name']} ({profile['location']}), VillageNova {title}:"]
     lines.extend(message.format(**profile) for message in templates)
     return "\n".join(lines)

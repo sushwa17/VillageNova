@@ -1,6 +1,6 @@
 # VillageNova
 
-VillageNova is a rural intelligence platform for the whole village.
+VillageNova is a rural intelligence platform for the whole village. It sends short, practical daily updates in a WhatsApp-style format to residents based on their selected domains, with local, verified, and low-risk guidance.
 
 ## Project structure
 
@@ -62,7 +62,11 @@ Schedule `village_hub/main.py` with Windows Task Scheduler once per day. The
 hub keeps a 24-hour delivery gate per resident, matching the farmer module.
 Each resident is processed separately and receives one digest assembled from
 their selected domain agents; no resident receives another resident's selected
-categories. The dashboard's forced send is for development only.
+categories.
+
+The platform is intentionally backend-first and message-oriented: daily updates
+are concise, local, and designed to feel natural in a chat app such as
+WhatsApp or SMS while staying grounded in verified local guidance.
 Future live integrations can be added inside each domain folder without
 mixing their logic into the hub.
 
